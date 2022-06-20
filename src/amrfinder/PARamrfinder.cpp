@@ -46,9 +46,9 @@ using std::unordered_map;
 using std::runtime_error;
 
 //DEBUG for time measure
-#define DEBUG 1
+//#define DEBUG 1
 
-#define PURE_BLOCK_DISTRIBUTION
+//#define PURE_BLOCK_DISTRIBUTION
 
 #ifndef PURE_BLOCK_DISTRIBUTION
 #define COST_DISTRIBUTION

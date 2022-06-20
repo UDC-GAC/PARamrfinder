@@ -29,15 +29,18 @@ CXX = g++
 MPICXX = mpic++
 CXXFLAGS = -Wall -std=c++11
 OMPFLAGS = -std=c++11 -fopenmp
+OMPIFLAGS = -std=c++11 -fopenmp
 OPTFLAGS = -O3
 DEBUGFLAGS = -g
 
 ifdef DEBUG
 CXXFLAGS += $(DEBUGFLAGS)
 OMPFLAGS += $(DEBUGFLAGS)
+OMPIFLAGS += $(DEBUGFLAGS)
 else
 CXXFLAGS += $(OPTFLAGS)
 OMPFLAGS += $(OPTFLAGS)
+OMPIFLAGS += -O2
 endif
 
 COMMON_DIR = ../common
@@ -59,7 +62,7 @@ amrfinder: $(addprefix $(COMMON_DIR)/, EpireadStats.o Epiread.o)
 	$(CXX) $(CXXFLAGS) -o $@ $@.cpp $^ $(CPPFLAGS) $(LDLIBS) $(LDFLAGS)
 
 PARamrfinder: $(addprefix $(COMMON_DIR)/, EpireadStats.o Epiread.o)
-	$(MPICXX) $(OMPFLAGS) -o $@ $@.cpp $^ $(CPPFLAGS) $(LDLIBS) $(LDFLAGS)
+	$(MPICXX) $(OMPIFLAGS) -o $@ $@.cpp $^ $(CPPFLAGS) $(LDLIBS) $(LDFLAGS)
 
 amrfinderOMP: $(addprefix $(COMMON_DIR)/, EpireadStats.o Epiread.o)
 	$(CXX) $(OMPFLAGS) -o $@ $@.cpp $^ $(CPPFLAGS) $(LDLIBS) $(LDFLAGS)

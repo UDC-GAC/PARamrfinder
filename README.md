@@ -1,0 +1,2 @@
+# PARamrfinder_dev
+PARamrfinder is a high efficient, parallel application to predict allele-specific DNA methylation (ASM) in mammals in the absence of SNP data. It is based on the work of Fang F, Hodges E, Molaro A, Dean MD, Hannon GJ and Smith AD, amrfinder, and it has been fully optimized to reduce its runtime from days to less than 15 minutes.

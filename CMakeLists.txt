@@ -24,6 +24,8 @@ include_directories(${GSL_INCLUDE_DIRS})
 include_directories(${HTSlib_INCLUDE_DIRS})
 include_directories(${ZLIB_INCLUDE_DIRS})
 
+enable_testing()
+
 add_subdirectory(src/smithlab_cpp)
 add_subdirectory(src/common)
 add_subdirectory(src/amrfinder)

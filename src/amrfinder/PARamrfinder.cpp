@@ -1126,11 +1126,15 @@ main(int argc, char **argv) {
     #endif
     /************************ TIME MEASURE ***********************/
 
-    const size_t BATCH_SIZE = get_batch_size(total_number_of_windows, total_cost, 
-                                              num_threads, number_of_processes);
+    size_t BATCH_SIZE = 0;
 
-    if(rank == MPI_ROOT_PROCESS){
-      swap_windows(windows, swap_info, total_cost, total_number_of_windows, BATCH_SIZE);
+    if (total_number_of_windows){
+      BATCH_SIZE = get_batch_size(total_number_of_windows, total_cost, 
+                                                num_threads, number_of_processes);
+
+      if(rank == MPI_ROOT_PROCESS){
+        swap_windows(windows, swap_info, total_cost, total_number_of_windows, BATCH_SIZE);
+      }
     }
 
     /*
@@ -1160,9 +1164,10 @@ main(int argc, char **argv) {
               reads_file, window_size, epistat);
     */
 
-    process_windows_dynamically(rank, number_of_processes, total_number_of_windows, swap_info.size(), 
-                              BATCH_SIZE, windows, basic_amrs, MPI_WINDOW_METADATA, 
-                              MPI_AMR, reads_file, window_size, epistat);    
+    if (total_number_of_windows)
+      process_windows_dynamically(rank, number_of_processes, total_number_of_windows, swap_info.size(), 
+                                BATCH_SIZE, windows, basic_amrs, MPI_WINDOW_METADATA, 
+                                MPI_AMR, reads_file, window_size, epistat);    
 
     /*                    
     move_data_pipelined(total_number_of_windows, MPI_WINDOW_METADATA, MPI_AMR,
@@ -1188,7 +1193,7 @@ main(int argc, char **argv) {
     #endif
     /************************ TIME MEASURE ***********************/
 
-    if(rank == MPI_ROOT_PROCESS){
+    if(total_number_of_windows && rank == MPI_ROOT_PROCESS){
       unswap_basic_amrs(basic_amrs, swap_info, BATCH_SIZE);
     }
 
@@ -2139,7 +2144,7 @@ readEpireadFile(string epireads_file, int rank, int number_of_processes,
     process_size_with_overlapping -= ONE_GB;
     buffer_slice = buffer_slice + ONE_GB;
   }
-  MPI_File_read_at(input_epireads_file, read_offset, buffer_slice, ONE_GB, MPI_CHAR, MPI_STATUS_IGNORE);
+  MPI_File_read_at(input_epireads_file, read_offset, buffer_slice, process_size_with_overlapping, MPI_CHAR, MPI_STATUS_IGNORE);
 
   // Add '\0' at the end, for security
   chunk[process_size_with_overlapping] = '\0';
@@ -2545,27 +2550,40 @@ add_overlapping_to_avoid_shared_on_end(const string &epireads_file,
   first_window_to_update_start = lowest_new_pos < window_size ? 
                                   0 : lowest_new_pos - (window_size - 1);
 
+
+  WindowMetadata last_window = WindowMetadata();
+  size_t chrom_start_index;
   // Clean invalid windows
   // First condition makes sure the position of the window is invalidated
   // The second condition makes sure the window remains in the same chrom
-  for (size_t i = windows.size() - 1; 
-        windows[i].window_start > first_window_to_update_start && 
-        windows[i].end_byte >= epireads_metadata[shared_epiread_index].start_byte; 
-        i--) {
-    total_cost -= windows[i].cost;
-    windows.pop_back();
-  }
-  
-  WindowMetadata last_window = windows[windows.size() - 1];
+  if (!windows.empty()){
+    for (size_t i = windows.size() - 1; 
+          windows[i].window_start > first_window_to_update_start && 
+          windows[i].end_byte >= epireads_metadata[shared_epiread_index].start_byte; 
+          i--) {
+      total_cost -= windows[i].cost;
+      windows.pop_back();
+    }
 
-  if(last_window.window_start == first_window_to_update_start){
-    windows.pop_back();
-    total_cost -= last_window.cost;
+    last_window = windows[windows.size() - 1];
+
+    if(last_window.window_start == first_window_to_update_start){
+      windows.pop_back();
+      total_cost -= last_window.cost;
+    }
+
+    chrom_start_index = find_epiread_index_from_offset(last_window.start_byte, 
+                                                        initial_epireads_size-1, 
+                                                        epireads_metadata);
+
+  } else {
+    chrom_start_index = shared_epiread_index;
+
+
+    while(chrom_start_index > 0 && epireads[chrom_start_index-1].chr == current_chrom)
+      chrom_start_index--;
   }
 
-  size_t chrom_start_index = find_epiread_index_from_offset(last_window.start_byte, 
-                                                              initial_epireads_size-1, 
-                                                              epireads_metadata);
   
   // Get the id of the chrom to preprocess
   auto it = chrom_name_to_id.find(current_chrom);
@@ -2595,7 +2613,7 @@ filter_leftover_windows(const string &epireads_file,
                         const unordered_map<string, size_t> &chrom_name_to_id){
 
   // If last window keeps using the shared epiread, more overlapping is required
-  if(windows[windows.size()-1].start_byte <= last_owned_byte){
+  if(windows.empty() || windows[windows.size()-1].start_byte <= last_owned_byte){
     size_t shared_epiread_index = find_epiread_index_from_offset(last_owned_byte, 
                                                         epireads_metadata.size()-1, 
                                                         epireads_metadata);
@@ -2637,11 +2655,17 @@ communicate_last_valid_window(const vector<WindowMetadata> &windows,
 
   MPI_Request request;
   WindowMetadata validation_window;
+  WindowMetadata null_window = WindowMetadata();
 
   // If i'm not the last process i will send the window to the next process
-  if(rank < number_of_processes-1)
-    MPI_Isend( &(windows[last_valid_window_index]), 1, MPI_WINDOW_METADATA, 
+  if(rank < number_of_processes-1){
+    if (windows.empty())
+      MPI_Isend( &null_window, 1, MPI_WINDOW_METADATA, 
                 rank+1, 1, MPI_COMM_WORLD, &request);
+    else
+      MPI_Isend( &(windows[last_valid_window_index]), 1, MPI_WINDOW_METADATA, 
+                rank+1, 1, MPI_COMM_WORLD, &request);
+  }
 
   // If i'm not the first process, receive the window from the previous process
   if(rank /* != 0 */)
@@ -3667,6 +3691,10 @@ swap_windows(vector<WindowMetadata> &windows,
     const size_t AVG_COST = (double) total_cost / (double) total_number_of_windows * BATCH_SIZE;
     const size_t COST_LIMIT = AVG_COST * 5;
     const size_t WINDOW_LIMIT = windows.size() < BATCH_SIZE ? 0 : windows.size() - BATCH_SIZE;
+
+    if (windows.size() <= BATCH_SIZE){
+      return;
+    }
 
     // For each batch to compute
     // But the last uncomplete batch

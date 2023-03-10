@@ -3,6 +3,8 @@ project(PARamrfinder)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/modules/")
 
+set(CTEST_BASE_DIRECTORY "${CMAKE_SOURCE_DIR}/cmake/tests")
+
 
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -29,3 +31,4 @@ enable_testing()
 add_subdirectory(src/smithlab_cpp)
 add_subdirectory(src/common)
 add_subdirectory(src/amrfinder)
+add_subdirectory(cmake/tests)

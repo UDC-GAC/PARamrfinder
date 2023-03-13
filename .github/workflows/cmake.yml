@@ -25,7 +25,7 @@ jobs:
 
     - name: Build
       # Build your program with the given configuration
-      run: cmake . && make && make install
+      run: cmake . && make 
 
     - name: Test
       # Execute tests defined by the CMake configuration.

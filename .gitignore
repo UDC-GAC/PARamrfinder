@@ -3,3 +3,4 @@ bin
 build
 lib
 cmake/tests/result/*
+!cmake/tests/result/.keepme

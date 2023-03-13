@@ -10,7 +10,7 @@ sudo apt-get -o Acquire::ForceIPv4=true install \
 OPENMPI_HOSTFILE=/etc/openmpi/openmpi-default-hostfile
 
 if [ -z "$(cat ${OPENMPI_HOSTFILE} | grep -v -E '^#')" ]; then\
-    echo \"localhost slots=32\" | sudo tee -a ${OPENMPI_HOSTFILE};\
+    echo "localhost slots=8" | sudo tee -a ${OPENMPI_HOSTFILE};\
 fi
 
 # Install HTSlib
